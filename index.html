@@ -31,7 +31,7 @@
       background-color: white;
       color: #007bff;
       cursor: pointer;
-      transition: all 10s;
+      transition: all 0.3s;
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     }
     button:hover {
@@ -81,18 +81,10 @@
     }
 
     function playBeep() {
-      try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const audioCtx = new AudioContext();
-        const oscillator = audioCtx.createOscillator();
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
-        oscillator.connect(audioCtx.destination);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 10.0); // 10 секунд
-      } catch (e) {
+      const audio = new Audio('5869604831877924517.mp3'); // Файл должен лежать рядом с HTML
+      audio.play().catch(e => {
         console.warn("Ошибка воспроизведения звука:", e);
-      }
+      });
     }
 
     async function sendData() {

